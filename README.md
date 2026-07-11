@@ -1,46 +1,42 @@
 # ZVONA
 
-Кликабельный адаптивный прототип платформы управляемого B2B-обзвона с AI-копилотом. Интерфейс рассчитан на desktop и лёгкий мобильный сценарий.
+Гибридный MVP управляемого B2B outreach для design partners.
 
-## Запуск
+```text
+ICP import → research → readiness → enrichment → routing
+→ outreach task → QA → next-best-action → CSV writeback
+```
+
+## Локальный запуск
 
 ```bash
 npm install
 npm run dev
 ```
 
-Откройте адрес, который покажет Vite. Все данные выдуманы и сохраняются только в `localStorage` браузера. Для возврата к исходному сценарию используйте кнопку «Сбросить демо».
+Откройте `http://localhost:3000`. Без PostgreSQL интерфейс работает на выдуманных demo-данных. API-ключ хранится только в `.env.local`, который исключён из Git.
+
+## Production-like запуск
+
+```bash
+docker compose up -d --build
+```
+
+Compose поднимает Next.js, PostgreSQL, отдельный worker и локальный object-storage volume.
 
 ## Проверка
 
 ```bash
-npm run build
 npm test
+npm run build
 ```
 
-Основной demo-маршрут: обучение → очередь → AI-досье → подготовка → звонок → завершение → оценка → начисление.
+## Границы пилота
 
-## Production Docker Compose
+- звонки выполняются вручную;
+- email и WhatsApp создаются только как черновики;
+- CRM writeback выполняется через CSV;
+- публичный номер не считается согласием на WhatsApp;
+- реальные CRM, телефония, billing и data providers не подключены.
 
-```bash
-docker compose up -d --build --remove-orphans
-```
-
-После запуска приложение будет доступно на `http://127.0.0.1:3000`.
-
-Для обновления сервера можно использовать:
-
-```bash
-sh scripts/deploy.sh
-```
-
-## Роли прототипа
-
-- Оператор;
-- Руководитель кампании;
-- Контролёр качества;
-- Менеджер по продажам.
-
-Текущая реализация охватывает вертикальный сценарий оператора: приветствие, обучение, enrichment, подготовку, звонок, результат, оценку и начисление. Аналитика, операторы и расширенный контроль качества представлены маршрутами-заглушками. Конфигуратор подарков вынесен в отдельную продуктовую историю и в это приложение не входит.
-
-Подробности: [видение продукта](docs/product-vision.md), [границы MVP](docs/mvp-scope.md), [путь оператора](docs/operator-journey.md), [enrichment pipeline](docs/enrichment-pipeline.md), [импорт справочников](docs/reference-data-import.md), [предметная модель](docs/domain-model.md), [качество и начисления](docs/quality-and-payments.md), [demo-сценарий](docs/demo-scenario.md).
+Архитектура и правила описаны в `docs/`. Внутренний реестр рисков: [docs/risk-register.md](docs/risk-register.md).

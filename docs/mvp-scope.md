@@ -1,34 +1,25 @@
-# Границы первой версии
+# Границы гибридного MVP
 
-## Реализуется
+## Реализовано в pilot-каркасе
 
-- App Shell и переключатель четырёх demo-ролей.
-- Короткое обучение оператора с локальной отметкой о прохождении.
-- Обзор кампании, очередь и карточка компании.
-- Demo-enrichment: lead score, сигналы, источники, неизвестные данные и качество досье.
-- AI-подготовка к звонку.
-- Управляемая симуляция live-звонка.
-- Фиксация результата и квалификации.
-- Оценка качества по шести критериям.
-- Статусы валидности `VALID`, `REVIEW_REQUIRED`, `INVALID`.
-- Расчёт начисления из настроек кампании.
-- Локальная апелляция оператора.
-- Маршруты-заглушки будущих разделов.
-- TypeScript-контракты будущих AI-модулей без реального выполнения.
+- Next.js/TypeScript приложение и PostgreSQL schema/migration.
+- Организации, membership roles и `organizationId` в бизнес-сущностях.
+- Campaign и Account Readiness Score.
+- Channel Policy Engine и suppression/consent модель.
+- Routing для manual call, email draft, WhatsApp draft, research и review.
+- Версионированная task card и snapshot для QA.
+- Qualification evidence и next-best-action.
+- CSV intake в интерфейсе и CRM-ready CSV export.
+- OpenAI server adapter со Structured Outputs для evidence-bound research.
+- PostgreSQL job queue, отдельный worker, audit events и AI usage schema.
+- Docker Compose с приложением, worker, PostgreSQL и object-storage volume.
+- Внутренний risk register, ADR и PR risk assessment.
 
-## Пока не реализуется полноценно
+## Ограничения пилота
 
-- аналитика и экспорт;
-- каталог и управление операторами;
-- рабочее место ручного контроля качества;
-- конфигуратор подарков — отдельная продуктовая история и не входит в этот MVP;
-- backend, база данных и синхронизация;
-- авторизация и разграничение доступа;
-- телефония, распознавание речи и реальные AI API;
-- CRM, платежи и уведомления.
-- настоящий поиск и парсинг открытых источников;
-- сложная оркестрация AI-агентов.
-
-Состояние прототипа сохраняется только в `localStorage` текущего браузера и может быть сброшено из интерфейса.
-
-Интерфейс проектируется desktop first, но основной операторский сценарий полностью доступен на мобильной ширине: навигация становится компактной, таблицы превращаются в карточки, а экран звонка перестраивается в последовательные блоки.
+- Managed authentication представлена схемой пользователей и ролей; production identity provider и session enforcement подключаются перед внешним доступом.
+- Demo UI работает на выдуманных данных; persistence API поверх PostgreSQL является следующим implementation slice.
+- Email и WhatsApp только draft-only.
+- Телефония и реальные CRM API отсутствуют.
+- Research API принимает подготовленный текст источника; защищённый site fetcher не включён до отдельного security review.
+- Автоматическая отправка, marketplace, billing и внешний контактный enrichment отсутствуют.

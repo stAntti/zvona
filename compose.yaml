@@ -1,19 +1,52 @@
 services:
-  zvona:
-    build:
-      context: .
+  app:
+    build: .
     restart: unless-stopped
+    env_file: .env.local
+    environment:
+      DATABASE_URL: postgres://zvona:zvona@postgres:5432/zvona
+      OBJECT_STORAGE_PATH: /data/objects
     ports:
       - "127.0.0.1:3000:3000"
-    networks:
-      - proxy
+    volumes:
+      - objects:/data/objects
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
 
-networks:
-  proxy:
-    external: true
+  worker:
+    build:
+      context: .
+      target: build
+    command: ["npm", "run", "worker"]
+    restart: unless-stopped
+    env_file: .env.local
+    environment:
+      DATABASE_URL: postgres://zvona:zvona@postgres:5432/zvona
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: zvona
+      POSTGRES_USER: zvona
+      POSTGRES_PASSWORD: zvona
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zvona -d zvona"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
+  objects:
