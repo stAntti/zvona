@@ -20,14 +20,19 @@ npm test
 
 Основной demo-маршрут: обучение → очередь → AI-досье → подготовка → звонок → завершение → оценка → начисление.
 
-## Docker
+## Production Docker Compose
 
 ```bash
-docker build -t zvona .
-docker run --rm -p 3000:3000 zvona
+docker compose up -d --build --remove-orphans
 ```
 
-После запуска приложение будет доступно на `http://localhost:3000`.
+После запуска приложение будет доступно на `http://127.0.0.1:3000`.
+
+Для обновления сервера можно использовать:
+
+```bash
+sh scripts/deploy.sh
+```
 
 ## Роли прототипа
 
