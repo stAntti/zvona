@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, type ChangeEvent } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { ArrowRight, Building2, Check, ChevronRight, CircleAlert, Database, Download, FileUp, Gauge, Mail, MessageCircle, Phone, Search, ShieldCheck, Sparkles, Target, Users } from 'lucide-react'
 import { calculateAccountReadiness, calculateCampaignReadiness, createTaskCard, recommendNextAction, routeAccount, toCrmCsv, type Account, type Campaign, type Channel } from '@/lib/domain'
 import { demoAccounts, demoCampaign } from '@/lib/fixtures'
@@ -24,6 +24,8 @@ export function OperationsApp() {
   const [view, setView] = useState<View>('overview')
   const [campaign, setCampaign] = useState<Campaign>(demoCampaign)
   const [accounts, setAccounts] = useState<Account[]>(demoAccounts)
+  const [organizationId, setOrganizationId] = useState(demoCampaign.organizationId)
+  const [dataMode, setDataMode] = useState<'loading' | 'postgres' | 'fixtures'>('loading')
   const [activeId, setActiveId] = useState('astra')
   const [toast, setToast] = useState('')
   const campaignReadiness = calculateCampaignReadiness(campaign)
@@ -33,7 +35,28 @@ export function OperationsApp() {
   const task = createTaskCard(campaign, active, activeRoute)
   const readyCount = routes.filter((row) => row.readiness.band === 'ready').length
 
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/pilot/state').then(async (response) => {
+      if (!response.ok) throw new Error('Pilot state unavailable')
+      return response.json() as Promise<{ organizationId: string; campaign: Campaign; accounts: Account[] }>
+    }).then((state) => {
+      if (cancelled) return
+      setOrganizationId(state.organizationId)
+      setCampaign(state.campaign)
+      setAccounts(state.accounts)
+      setActiveId(state.accounts[0]?.id ?? '')
+      setDataMode('postgres')
+    }).catch(() => { if (!cancelled) setDataMode('fixtures') })
+    return () => { cancelled = true }
+  }, [])
+
   const flash = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 2500) }
+  const saveCampaignToServer = async () => {
+    if (dataMode !== 'postgres') return flash('PostgreSQL недоступен, изменения остались в demo-режиме')
+    const response = await fetch('/api/pilot/campaign', { method: 'PUT', headers: { 'content-type': 'application/json', 'x-zvona-organization': organizationId }, body: JSON.stringify(campaign) })
+    flash(response.ok ? 'Кампания сохранена в PostgreSQL' : 'Не удалось сохранить кампанию')
+  }
   const downloadCsv = () => {
     const blob = new Blob([toCrmCsv(routes.map(({ account, route }) => ({ account, route, outcome: account.id === 'astra' ? 'qualified' : '', nextAction: account.id === 'astra' ? 'route_to_ae' : 'nurture' })))], { type: 'text/csv;charset=utf-8' })
     const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'zvona-crm-writeback.csv'; link.click(); URL.revokeObjectURL(link.href)
@@ -47,7 +70,12 @@ export function OperationsApp() {
       const values = line.split(',')
       return { id: `import-${Date.now()}-${index}`, organizationId: 'org-zvona', externalId: get(values, 'external_id') || `CSV-${index + 1}`, name: get(values, 'name') || `Компания ${index + 1}`, domain: get(values, 'domain'), industry: get(values, 'industry'), employeeCount: Number(get(values, 'employees')) || undefined, region: get(values, 'region') || 'Не указан', language: get(values, 'language') || 'ru', icpFit: true, triggers: [], persona: get(values, 'persona') || 'Требует research', personaConfidence: .35, potential: Number(get(values, 'potential')) || 0, contacts: [] }
     })
-    setAccounts((current) => [...current, ...created]); flash(`Импортировано: ${created.length}`); setView('accounts')
+    const scoped = created.map((account) => ({ ...account, organizationId }))
+    if (dataMode === 'postgres') {
+      const response = await fetch('/api/pilot/accounts', { method: 'POST', headers: { 'content-type': 'application/json', 'x-zvona-organization': organizationId }, body: JSON.stringify({ campaignId: campaign.id, accounts: scoped }) })
+      if (!response.ok) return flash('CSV не сохранён: проверьте обязательные поля')
+    }
+    setAccounts((current) => [...current.filter((account) => !scoped.some((item) => item.externalId === account.externalId)), ...scoped]); flash(`Импортировано: ${scoped.length}`); setView('accounts')
   }
 
   return <div className="app-shell">
@@ -55,13 +83,13 @@ export function OperationsApp() {
       <button className="brand" onClick={() => setView('overview')}><span>Z</span><strong>ZVONA<small>outreach operations</small></strong></button>
       <div className="workspace"><i /><div><span>Design partner</span><strong>Northstar Gifts KZ</strong></div></div>
       <nav aria-label="Основная навигация">{nav.map((item) => <button key={item.id} className={view === item.id ? 'active' : ''} onClick={() => setView(item.id)}><item.icon size={18}/>{item.label}</button>)}</nav>
-      <div className="sidebar-foot"><Database size={16}/><span>Tenant: org-zvona<small>demo data · isolated</small></span></div>
+      <div className="sidebar-foot"><Database size={16}/><span>Tenant: {organizationId.slice(0, 8)}<small>{dataMode === 'postgres' ? 'PostgreSQL · isolated' : dataMode === 'loading' ? 'подключение…' : 'fixture fallback'}</small></span></div>
     </aside>
     <section className="workspace-main">
       <header className="topbar"><div><span className="crumb">Кампания / {nav.find((item) => item.id === view)?.label}</span><strong>{campaign.name}</strong></div><div className="top-actions"><span className={`readiness-badge ${campaignReadiness.band}`}><i /> Readiness {campaignReadiness.score}</span><button className="button secondary" onClick={downloadCsv}><Download size={16}/> CRM CSV</button></div></header>
       <main id="main" className="content">
         {view === 'overview' && <Overview campaign={campaign} routes={routes} onNavigate={setView} />}
-        {view === 'campaign' && <CampaignEditor campaign={campaign} setCampaign={setCampaign} />}
+        {view === 'campaign' && <CampaignEditor campaign={campaign} setCampaign={setCampaign} onSave={saveCampaignToServer} />}
         {view === 'accounts' && <AccountsView rows={routes} activeId={activeId} onSelect={(id) => { setActiveId(id); setView('task') }} importCsv={importCsv} />}
         {view === 'queue' && <QueueView rows={routes} onSelect={(id) => { setActiveId(id); setView('task') }} />}
         {view === 'task' && <TaskView task={task} account={active} onComplete={() => { flash('Outcome сохранён, создано действие route_to_ae'); setView('qa') }} />}
@@ -93,10 +121,10 @@ function rowsShape() { return [] as Array<{ account: Account; route: ReturnType<
 function FlowStep({ value, label }: { value: string | number; label: string }) { return <div><strong>{value}</strong><span>{label}</span></div> }
 function Action({ icon: Icon, count, label, detail }: { icon: typeof Phone; count: string; label: string; detail: string }) { return <div className="action-line"><span className="action-icon"><Icon size={18}/></span><strong>{count}</strong><div><span>{label}</span><small>{detail}</small></div><ChevronRight size={17}/></div> }
 
-function CampaignEditor({ campaign, setCampaign }: { campaign: Campaign; setCampaign: (value: Campaign) => void }) {
+function CampaignEditor({ campaign, setCampaign, onSave }: { campaign: Campaign; setCampaign: (value: Campaign) => void; onSave: () => void }) {
   const score = calculateCampaignReadiness(campaign)
   const field = (key: keyof Campaign, value: string) => setCampaign({ ...campaign, [key]: value })
-  return <><section className="page-heading compact"><div><span className="section-kicker">Readiness gate</span><h1>Правила кампании</h1><p>Execution блокируется, если offer, claims или qualification criteria не готовы.</p></div><div className={`score-tile ${score.band}`}><strong>{score.score}</strong><span>{score.band}</span></div></section><div className="editor-layout"><form className="panel form-panel" onSubmit={(event) => event.preventDefault()}><label>Название кампании<input value={campaign.name} onChange={(e) => field('name', e.target.value)}/></label><label>Offer<textarea value={campaign.offer} onChange={(e) => field('offer', e.target.value)}/></label><label>ICP<textarea value={campaign.icp} onChange={(e) => field('icp', e.target.value)}/></label><label>Qualification definition<textarea value={campaign.qualificationDefinition} onChange={(e) => field('qualificationDefinition', e.target.value)}/></label><button className="button primary" type="button">Сохранено локально <Check size={16}/></button></form><section className="panel checklist"><h2>Проверка запуска</h2>{score.factors.map((factor) => <div className="check-row" key={factor.label}><span className={factor.passed ? 'pass' : 'fail'}>{factor.passed ? <Check size={14}/> : <CircleAlert size={14}/>}</span><span>{factor.label}</span><strong>{factor.points}</strong></div>)}</section></div></>
+  return <><section className="page-heading compact"><div><span className="section-kicker">Readiness gate</span><h1>Правила кампании</h1><p>Execution блокируется, если offer, claims или qualification criteria не готовы.</p></div><div className={`score-tile ${score.band}`}><strong>{score.score}</strong><span>{score.band}</span></div></section><div className="editor-layout"><form className="panel form-panel" onSubmit={(event) => event.preventDefault()}><label>Название кампании<input value={campaign.name} onChange={(e) => field('name', e.target.value)}/></label><label>Offer<textarea value={campaign.offer} onChange={(e) => field('offer', e.target.value)}/></label><label>ICP<textarea value={campaign.icp} onChange={(e) => field('icp', e.target.value)}/></label><label>Qualification definition<textarea value={campaign.qualificationDefinition} onChange={(e) => field('qualificationDefinition', e.target.value)}/></label><button className="button primary" type="button" onClick={onSave}>Сохранить кампанию <Check size={16}/></button></form><section className="panel checklist"><h2>Проверка запуска</h2>{score.factors.map((factor) => <div className="check-row" key={factor.label}><span className={factor.passed ? 'pass' : 'fail'}>{factor.passed ? <Check size={14}/> : <CircleAlert size={14}/>}</span><span>{factor.label}</span><strong>{factor.points}</strong></div>)}</section></div></>
 }
 
 function AccountsView({ rows, activeId, onSelect, importCsv }: { rows: ReturnType<typeof rowsShape>; activeId: string; onSelect: (id: string) => void; importCsv: (event: ChangeEvent<HTMLInputElement>) => void }) {

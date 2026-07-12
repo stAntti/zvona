@@ -14,7 +14,7 @@ npm install
 npm run dev
 ```
 
-Откройте `http://localhost:3000`. Без PostgreSQL интерфейс работает на выдуманных demo-данных. API-ключ хранится только в `.env.local`, который исключён из Git.
+Откройте `http://localhost:3000`. При запущенном Compose campaign и CSV imports сохраняются в PostgreSQL. Без PostgreSQL интерфейс явно переключается на выдуманные fixtures. API-ключ хранится только в `.env.local`, который исключён из Git и Docker build context.
 
 ## Production-like запуск
 
@@ -23,6 +23,12 @@ docker compose up -d --build
 ```
 
 Compose поднимает Next.js, PostgreSQL, отдельный worker и локальный object-storage volume.
+
+При первом чистом запуске примените миграцию:
+
+```bash
+docker compose exec -T postgres psql -U zvona -d zvona < db/migrations/0001_pilot.sql
+```
 
 ## Проверка
 
