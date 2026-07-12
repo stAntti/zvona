@@ -1,0 +1,13 @@
+services:
+  app:
+    environment:
+      COOKIE_SECURE: "true"
+    networks:
+      default:
+      proxy:
+        aliases:
+          - zvona
+
+networks:
+  proxy:
+    external: true
