@@ -7,6 +7,8 @@ import { demoAccounts, demoCampaign } from '@/lib/fixtures'
 
 type View = 'overview' | 'campaign' | 'accounts' | 'queue' | 'task' | 'qa'
 type Analytics = { accounts:{total:number;ready:number;suppressed:number}; tasks:{total:number;completed:number;qualified:number;meetings:number}; qaAverage:number|null; aiCostMicros:number; costPerQualifiedMicros:number|null }
+type QualificationEvidence = { decisionMaker: boolean; activeNeed: boolean; agreedNextStep: boolean }
+type TaskCompletion = { outcome: string; notes: string; evidence: QualificationEvidence; nextAction: string }
 
 const nav: Array<{ id: View; label: string; icon: typeof Target }> = [
   { id: 'overview', label: 'Командный центр', icon: Gauge },
@@ -28,6 +30,7 @@ export function OperationsApp() {
   const [organizationId, setOrganizationId] = useState(demoCampaign.organizationId)
   const [dataMode, setDataMode] = useState<'loading' | 'postgres' | 'fixtures'>('loading')
   const [analytics, setAnalytics] = useState<Analytics | null>(null)
+  const [completion, setCompletion] = useState<TaskCompletion | null>(null)
   const [activeId, setActiveId] = useState('astra')
   const [toast, setToast] = useState('')
   const campaignReadiness = calculateCampaignReadiness(campaign)
@@ -81,6 +84,20 @@ export function OperationsApp() {
     }
     setAccounts((current) => [...current.filter((account) => !scoped.some((item) => item.externalId === account.externalId)), ...scoped]); flash(`Импортировано: ${scoped.length}`); setView('accounts')
   }
+  const completeActiveTask = async (input: Omit<TaskCompletion, 'nextAction'>) => {
+    if (dataMode !== 'postgres') throw new Error('Завершение задач доступно только при подключённом PostgreSQL')
+    const created = await fetch('/api/pilot/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'create', accountId: active.id }) })
+    const createdBody = await created.json()
+    if (!created.ok) throw new Error(createdBody.error ?? 'Не удалось создать задачу')
+    const completed = await fetch('/api/pilot/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'complete', taskId: createdBody.id, ...input }) })
+    const completedBody = await completed.json()
+    if (!completed.ok) throw new Error(completedBody.error ?? 'Не удалось завершить задачу')
+    setCompletion(completedBody)
+    setAnalytics(null)
+    fetch('/api/pilot/analytics').then(response => response.ok ? response.json() : null).then(value => { if (value) setAnalytics(value) })
+    flash(`Outcome сохранён, создано действие ${completedBody.nextAction}`)
+    setView('qa')
+  }
 
   return <div className="app-shell">
     <aside className="sidebar">
@@ -96,8 +113,8 @@ export function OperationsApp() {
         {view === 'campaign' && <CampaignEditor campaign={campaign} setCampaign={setCampaign} onSave={saveCampaignToServer} />}
         {view === 'accounts' && <AccountsView rows={routes} activeId={activeId} onSelect={(id) => { setActiveId(id); setView('task') }} importCsv={importCsv} />}
         {view === 'queue' && <QueueView rows={routes} onSelect={(id) => { setActiveId(id); setView('task') }} />}
-        {view === 'task' && <TaskView task={task} account={active} onComplete={() => { flash('Outcome сохранён, создано действие route_to_ae'); setView('qa') }} />}
-        {view === 'qa' && <QaView account={active} />}
+        {view === 'task' && <TaskView task={task} account={active} onComplete={completeActiveTask} />}
+        {view === 'qa' && <QaView account={active} completion={completion} />}
       </main>
     </section>
     {toast && <div className="toast"><Check size={16}/>{toast}</div>}
@@ -140,13 +157,19 @@ function AccountsView({ rows, activeId, onSelect, importCsv }: { rows: ReturnTyp
 function QueueView({ rows, onSelect }: { rows: ReturnType<typeof rowsShape>; onSelect: (id: string) => void }) { return <><section className="page-heading compact"><div><span className="section-kicker">Routing engine</span><h1>Очередь исполнимых задач</h1><p>Каждая строка объясняет канал, исполнителя и правило выбора.</p></div></section><section className="queue-list">{rows.map(({ account, readiness, route }, index) => <article className="queue-item" key={account.id}><span className="queue-index">{String(index + 1).padStart(2, '0')}</span><div className="queue-company"><strong>{account.name}</strong><span>{account.persona} · readiness {readiness.score}</span></div><div className="channel-mark"><ChannelIcon channel={route.channel}/><span><strong>{channelLabels[route.channel]}</strong><small>{route.policy}</small></span></div><div className="route-reason"><span>{route.ruleId}</span><p>{route.reason}</p></div><button className="button secondary" onClick={() => onSelect(account.id)}>Открыть <ArrowRight size={15}/></button></article>)}</section></> }
 function ChannelIcon({ channel }: { channel: Channel }) { const Icon = channel === 'manual_call' ? Phone : channel === 'email_draft' ? Mail : channel === 'whatsapp_draft' ? MessageCircle : Search; return <span className="channel-icon"><Icon size={18}/></span> }
 
-function TaskView({ task, account, onComplete }: { task: ReturnType<typeof createTaskCard>; account: Account; onComplete: () => void }) {
+function TaskView({ task, account, onComplete }: { task: ReturnType<typeof createTaskCard>; account: Account; onComplete: (input: Omit<TaskCompletion, 'nextAction'>) => Promise<void> }) {
   const [draft, setDraft] = useState('Здравствуйте! Увидели, что ваша команда расширяется. Подскажите, кто отвечает за корпоративные подарки для сотрудников и партнёров?')
-  return <><section className="task-header"><div><span className="section-kicker">Task {task.id} · v{task.version}</span><h1>{account.name}</h1><p>{task.goal}</p></div><div className="task-channel"><ChannelIcon channel={task.channel}/><span><small>Канал</small><strong>{channelLabels[task.channel]}</strong></span></div></section><div className="task-grid"><div className="task-primary"><section className="panel dossier"><h2>Почему этот аккаунт</h2>{task.whyAccount.map((signal) => <div className="signal" key={signal}><Sparkles size={15}/>{signal}</div>)}<div className="persona"><span>Persona hypothesis</span><strong>{task.personaSummary}</strong></div></section><section className="panel"><h2>Обязательные вопросы</h2><ol className="question-list">{task.mandatoryQuestions.map((question) => <li key={question}><span/><p>{question}</p></li>)}</ol></section>{task.channel !== 'manual_call' && <section className="panel draft-panel"><div className="panel-heading"><div><h2>Черновик сообщения</h2><p>Отправка вне ZVONA. Проверьте источник и consent.</p></div><span className="draft-only">draft only</span></div><textarea value={draft} onChange={(e) => setDraft(e.target.value)}/><div className="source-note"><CircleAlert size={15}/> Публичный контакт не означает согласие на WhatsApp-рассылку.</div></section>}</div><aside className="task-guardrails"><section className="guard allowed"><h3><Check size={16}/> Можно обещать</h3>{task.allowedClaims.map((item) => <p key={item}>{item}</p>)}</section><section className="guard forbidden"><h3><CircleAlert size={16}/> Запрещено</h3>{task.forbiddenClaims.map((item) => <p key={item}>{item}</p>)}</section><section className="panel compact-panel"><h3>Вероятные возражения</h3>{task.objections.map((item) => <button key={item}>{item}<ChevronRight size={14}/></button>)}</section><button className="button primary wide" onClick={onComplete}>Завершить и проверить <ArrowRight size={16}/></button></aside></div></>
+  const [outcome, setOutcome] = useState('qualified')
+  const [notes, setNotes] = useState('')
+  const [evidence, setEvidence] = useState<QualificationEvidence>({ decisionMaker: true, activeNeed: true, agreedNextStep: true })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const submit = async () => { setSaving(true); setError(''); try { await onComplete({ outcome, notes, evidence }) } catch (cause) { setError(cause instanceof Error ? cause.message : 'Не удалось завершить задачу') } finally { setSaving(false) } }
+  return <><section className="task-header"><div><span className="section-kicker">Task {task.id} · v{task.version}</span><h1>{account.name}</h1><p>{task.goal}</p></div><div className="task-channel"><ChannelIcon channel={task.channel}/><span><small>Канал</small><strong>{channelLabels[task.channel]}</strong></span></div></section><div className="task-grid"><div className="task-primary"><section className="panel dossier"><h2>Почему этот аккаунт</h2>{task.whyAccount.map((signal) => <div className="signal" key={signal}><Sparkles size={15}/>{signal}</div>)}<div className="persona"><span>Persona hypothesis</span><strong>{task.personaSummary}</strong></div></section><section className="panel"><h2>Обязательные вопросы</h2><ol className="question-list">{task.mandatoryQuestions.map((question) => <li key={question}><span/><p>{question}</p></li>)}</ol></section>{task.channel !== 'manual_call' && <section className="panel draft-panel"><div className="panel-heading"><div><h2>Черновик сообщения</h2><p>Отправка вне ZVONA. Проверьте источник и consent.</p></div><span className="draft-only">draft only</span></div><textarea value={draft} onChange={(e) => setDraft(e.target.value)}/><div className="source-note"><CircleAlert size={15}/> Публичный контакт не означает согласие на WhatsApp-рассылку.</div></section>}</div><aside className="task-guardrails"><section className="guard allowed"><h3><Check size={16}/> Можно обещать</h3>{task.allowedClaims.map((item) => <p key={item}>{item}</p>)}</section><section className="guard forbidden"><h3><CircleAlert size={16}/> Запрещено</h3>{task.forbiddenClaims.map((item) => <p key={item}>{item}</p>)}</section><section className="panel compact-panel"><h3>Результат</h3><label>Outcome<select value={outcome} onChange={(event) => setOutcome(event.target.value)}><option value="qualified">Квалифицирован</option><option value="follow_up">Перезвонить</option><option value="not_interested">Неактуально</option><option value="wrong_contact">Неверный контакт</option><option value="opt_out">Opt-out</option></select></label><label>Заметки<textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Факты и договорённости"/></label>{Object.entries({ decisionMaker: 'ЛПР подтверждён', activeNeed: 'Есть актуальная потребность', agreedNextStep: 'Согласован следующий шаг' }).map(([key, label]) => <label key={key}><input type="checkbox" checked={evidence[key as keyof QualificationEvidence]} onChange={(event) => setEvidence(current => ({ ...current, [key]: event.target.checked }))}/>{label}</label>)}</section>{error && <div className="source-note"><CircleAlert size={15}/>{error}</div>}<button className="button primary wide" disabled={saving} onClick={submit}>{saving ? 'Сохраняем…' : 'Завершить и проверить'} {!saving && <ArrowRight size={16}/>}</button></aside></div></>
 }
 
-function QaView({ account }: { account: Account }) {
-  const evidence = { decisionMaker: true, activeNeed: true, agreedNextStep: true }
-  const next = recommendNextAction('qualified', evidence)
+function QaView({ account, completion }: { account: Account; completion: TaskCompletion | null }) {
+  const evidence = completion?.evidence ?? { decisionMaker: true, activeNeed: true, agreedNextStep: true }
+  const next = completion?.nextAction ?? recommendNextAction('qualified', evidence)
   return <><section className="page-heading compact"><div><span className="section-kicker">Post-call review</span><h1>Outcome подтверждён</h1><p>QA сверил task snapshot, logging и демонстрационный transcript.</p></div><span className="valid-stamp"><Check size={20}/> VALID</span></section><div className="qa-layout"><section className="panel qa-score"><span>Quality score</span><strong>92</strong><small>оператор соблюдал правила кампании</small><div className="meter"><i style={{ width: '92%' }}/></div></section><section className="panel evidence-panel"><h2>Qualification evidence</h2><div className="evidence"><Check size={16}/><span><strong>ЛПР найден</strong><small>HR Director подтверждён в разговоре</small></span></div><div className="evidence"><Check size={16}/><span><strong>Потребность актуальна</strong><small>300 наборов до 15 ноября</small></span></div><div className="evidence"><Check size={16}/><span><strong>Следующий шаг согласован</strong><small>Discovery call с закупками</small></span></div></section><section className="panel next-action"><span>Next-best-action</span><h2>{next}</h2><p>{account.name} передаётся account executive вместе с evidence и task snapshot.</p><button className="button primary">Создать задачу AE <ArrowRight size={16}/></button></section></div></>
 }
