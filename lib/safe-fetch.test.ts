@@ -1,0 +1,3 @@
+import {describe,expect,it} from 'vitest'
+import {isPrivateAddress,validatePublicUrl} from './safe-fetch'
+describe('safe public research fetcher',()=>{it('blocks private IPv4 ranges',()=>{expect(isPrivateAddress('127.0.0.1')).toBe(true);expect(isPrivateAddress('10.1.2.3')).toBe(true);expect(isPrivateAddress('192.168.1.2')).toBe(true);expect(isPrivateAddress('8.8.8.8')).toBe(false)});it('blocks loopback hostnames after DNS resolution',async()=>{await expect(validatePublicUrl('http://localhost/admin')).rejects.toThrow()});it('rejects non-http protocols',async()=>{await expect(validatePublicUrl('file:///etc/passwd')).rejects.toThrow('HTTP')})})

@@ -1,0 +1,1 @@
+import{NextResponse}from'next/server';import{requirePilotSession}from'@/lib/auth';import{getAnalytics}from'@/lib/analytics';export async function GET(){try{const s=await requirePilotSession();return NextResponse.json(await getAnalytics(s.organizationId))}catch{return NextResponse.json({error:'Unauthorized'},{status:401})}}

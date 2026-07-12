@@ -28,10 +28,10 @@
 | R-006 | Data-provider lock-in и ограничения external use | high | high | Изменение terms; рост цены; отключение API | Provider adapters, отдельные agreements, provenance, outcome graph | Founder | research, enrichment | 2026-07-12 | 2026-07-26 | monitoring | External providers out of MVP |
 | R-007 | AI hype mismatch: demo интереснее измеримого ROI | high | high | Demo usage без активных кампаний; нет accepted SQL | Продавать speed-to-qualified-outcome, coverage и cost per SQL | Product | analytics | 2026-07-12 | 2026-07-26 | open | Pilot metrics |
 | R-008 | Channel/platform enforcement | high | critical | Opt-out; жалобы; блокировка домена или WhatsApp | Draft-only MVP, channel policy, consent, suppression, официальные API | Compliance | outreach | 2026-07-12 | 2026-07-26 | monitoring | ADR-001 |
-| R-009 | Tenant/data leakage | medium | critical | Cross-tenant ответы или экспорт | organizationId scoping, authorization tests, audit, scoped storage | Engineering | API, database, storage | 2026-07-12 | 2026-07-26 | open | Security test suite |
-| R-010 | AI hallucinated claims | high | critical | Draft содержит claim без evidence | Claims registry, evidence-bound generation, blocking validation, human approval | AI/QA | AI, task card | 2026-07-12 | 2026-07-26 | open | Structured-output tests |
-| R-011 | Research provenance failure | medium | high | Факт нельзя подтвердить; источник устарел | URL, evidence, retrievedAt, confidence, revalidation | Research | research | 2026-07-12 | 2026-07-26 | open | Provenance schema |
-| R-012 | Unit economics failure | medium | high | Research/QA cost выше outcome value | Usage metering, model routing, stage cost, retry limits | Founder | AI, analytics | 2026-07-12 | 2026-07-26 | open | ai_runs cost fields |
+| R-009 | Tenant/data leakage | medium | critical | Cross-tenant ответы или экспорт | organizationId scoping, authorization tests, audit, scoped storage | Engineering | API, database, storage | 2026-07-12 | 2026-07-26 | monitoring | Auth/task/storage E2E; security-audit.md |
+| R-010 | AI hallucinated claims | high | critical | Draft содержит claim без evidence | Claims registry, evidence-bound generation, blocking validation, human approval | AI/QA | AI, task card | 2026-07-12 | 2026-07-26 | monitoring | Structured Outputs smoke test; draft-only policy |
+| R-011 | Research provenance failure | medium | high | Факт нельзя подтвердить; источник устарел | URL, evidence, retrievedAt, confidence, revalidation | Research | research | 2026-07-12 | 2026-07-26 | monitoring | safe-fetch tests; ai_runs source_refs |
+| R-012 | Unit economics failure | medium | high | Research/QA cost выше outcome value | Usage metering, model routing, stage cost, retry limits | Founder | AI, analytics | 2026-07-12 | 2026-07-26 | monitoring | ai_runs metering; analytics cost per outcome |
 
 ## Release gate
 

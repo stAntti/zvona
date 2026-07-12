@@ -1,0 +1,2 @@
+CREATE TABLE artifacts (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),organization_id uuid NOT NULL REFERENCES organizations(id),kind text NOT NULL,storage_key text NOT NULL UNIQUE,original_name text NOT NULL,content_type text NOT NULL,size_bytes integer NOT NULL,sha256 text NOT NULL,retention_until timestamptz NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),deleted_at timestamptz);
+CREATE INDEX artifacts_retention_idx ON artifacts(retention_until) WHERE deleted_at IS NULL;

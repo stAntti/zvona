@@ -1,0 +1,1 @@
+import{requirePilotSession}from'@/lib/auth';import{crmWritebackCsv}from'@/lib/analytics';export async function GET(){const s=await requirePilotSession();return new Response(await crmWritebackCsv(s.organizationId),{headers:{'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename="zvona-writeback.csv"','cache-control':'no-store'}})}

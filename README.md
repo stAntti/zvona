@@ -28,6 +28,8 @@ Compose поднимает Next.js, PostgreSQL, отдельный worker и л�
 
 ```bash
 docker compose exec -T postgres psql -U zvona -d zvona < db/migrations/0001_pilot.sql
+docker compose exec -T postgres psql -U zvona -d zvona < db/migrations/0002_auth.sql
+docker compose exec -T postgres psql -U zvona -d zvona < db/migrations/0003_artifacts.sql
 ```
 
 ## Проверка

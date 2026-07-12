@@ -13,14 +13,20 @@
 - OpenAI server adapter со Structured Outputs для evidence-bound research.
 - PostgreSQL job queue, отдельный worker, audit events и AI usage schema.
 - Tenant-scoped persistence API для campaign state и идемпотентного CSV import.
+- Managed invite authentication и HttpOnly tenant sessions.
+- SSRF-safe public research fetcher и provenance.
+- Worker handlers для research, drafts, QA и retention cleanup.
+- Persistent tasks, outcomes, suppression и next-best-action.
+- Tenant object storage с SHA-256 и retention.
+- Event-derived analytics и PostgreSQL CRM writeback.
 - Docker Compose с приложением, worker, PostgreSQL и object-storage volume.
 - Внутренний risk register, ADR и PR risk assessment.
 
 ## Ограничения пилота
 
-- Managed authentication представлена схемой пользователей и ролей; production identity provider и session enforcement подключаются перед внешним доступом.
+- Managed authentication использует provisioned одноразовые invites; публичная регистрация отсутствует.
 - Demo UI загружает и сохраняет состояние в PostgreSQL; при недоступной базе явно переключается на fixture fallback.
 - Email и WhatsApp только draft-only.
 - Телефония и реальные CRM API отсутствуют.
-- Research API принимает подготовленный текст источника; защищённый site fetcher не включён до отдельного security review.
+- Public research разрешает только HTTP(S) и блокирует private/local DNS targets.
 - Автоматическая отправка, marketplace, billing и внешний контактный enrichment отсутствуют.

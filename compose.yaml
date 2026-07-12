@@ -6,6 +6,7 @@ services:
     environment:
       DATABASE_URL: postgres://zvona:zvona@postgres:5432/zvona
       OBJECT_STORAGE_PATH: /data/objects
+      COOKIE_SECURE: "false"
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
@@ -13,6 +14,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      storage-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health >/dev/null 2>&1 || exit 1"]
       interval: 30s
@@ -46,6 +49,13 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  storage-init:
+    image: alpine:3.22
+    command: ["sh", "-c", "chown -R 1001:1001 /data/objects"]
+    volumes:
+      - objects:/data/objects
+    restart: "no"
 
 volumes:
   postgres-data:

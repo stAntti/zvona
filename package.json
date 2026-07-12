@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "worker": "tsx worker/index.ts",
+    "invite": "tsx scripts/create-invite.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

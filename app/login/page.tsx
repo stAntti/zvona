@@ -1,0 +1,4 @@
+'use client'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+export default function LoginPage(){const[token,setToken]=useState('');const[error,setError]=useState('');const router=useRouter();return <main className="login-shell"><form className="login-card" onSubmit={async e=>{e.preventDefault();setError('');const response=await fetch('/api/auth/redeem',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token})});if(!response.ok)return setError('Ссылка недействительна или истекла');router.replace('/');router.refresh()}}><span className="brand-login">Z</span><h1>Вход в pilot workspace</h1><p>Введите одноразовый код из приглашения ZVONA.</p><label>Код приглашения<input value={token} onChange={e=>setToken(e.target.value)} autoComplete="one-time-code" required/></label>{error&&<div className="login-error">{error}</div>}<button className="button primary" type="submit">Продолжить</button></form></main>}

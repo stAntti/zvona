@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { saveCampaign } from '@/lib/repository'
 import { campaignSchema } from '@/lib/validation'
+import { requirePilotSession } from '@/lib/auth'
 
 export async function PUT(request: Request) {
   try {
-    const organizationId = request.headers.get('x-zvona-organization')
-    if (!organizationId) return NextResponse.json({ error: 'Organization scope is required' }, { status: 401 })
+    const { organizationId } = await requirePilotSession()
     const campaign = campaignSchema.parse(await request.json())
     if (campaign.organizationId !== organizationId) return NextResponse.json({ error: 'Organization mismatch' }, { status: 403 })
     return NextResponse.json(await saveCampaign(organizationId, campaign))

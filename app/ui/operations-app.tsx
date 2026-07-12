@@ -6,6 +6,7 @@ import { calculateAccountReadiness, calculateCampaignReadiness, createTaskCard, 
 import { demoAccounts, demoCampaign } from '@/lib/fixtures'
 
 type View = 'overview' | 'campaign' | 'accounts' | 'queue' | 'task' | 'qa'
+type Analytics = { accounts:{total:number;ready:number;suppressed:number}; tasks:{total:number;completed:number;qualified:number;meetings:number}; qaAverage:number|null; aiCostMicros:number; costPerQualifiedMicros:number|null }
 
 const nav: Array<{ id: View; label: string; icon: typeof Target }> = [
   { id: 'overview', label: 'Командный центр', icon: Gauge },
@@ -26,6 +27,7 @@ export function OperationsApp() {
   const [accounts, setAccounts] = useState<Account[]>(demoAccounts)
   const [organizationId, setOrganizationId] = useState(demoCampaign.organizationId)
   const [dataMode, setDataMode] = useState<'loading' | 'postgres' | 'fixtures'>('loading')
+  const [analytics, setAnalytics] = useState<Analytics | null>(null)
   const [activeId, setActiveId] = useState('astra')
   const [toast, setToast] = useState('')
   const campaignReadiness = calculateCampaignReadiness(campaign)
@@ -47,6 +49,7 @@ export function OperationsApp() {
       setAccounts(state.accounts)
       setActiveId(state.accounts[0]?.id ?? '')
       setDataMode('postgres')
+      fetch('/api/pilot/analytics').then(response => response.ok ? response.json() : null).then(value => { if (value && !cancelled) setAnalytics(value) })
     }).catch(() => { if (!cancelled) setDataMode('fixtures') })
     return () => { cancelled = true }
   }, [])
@@ -54,10 +57,11 @@ export function OperationsApp() {
   const flash = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 2500) }
   const saveCampaignToServer = async () => {
     if (dataMode !== 'postgres') return flash('PostgreSQL недоступен, изменения остались в demo-режиме')
-    const response = await fetch('/api/pilot/campaign', { method: 'PUT', headers: { 'content-type': 'application/json', 'x-zvona-organization': organizationId }, body: JSON.stringify(campaign) })
+    const response = await fetch('/api/pilot/campaign', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(campaign) })
     flash(response.ok ? 'Кампания сохранена в PostgreSQL' : 'Не удалось сохранить кампанию')
   }
-  const downloadCsv = () => {
+  const downloadCsv = async () => {
+    if(dataMode==='postgres'){const response=await fetch('/api/pilot/writeback');if(response.ok){const blob=await response.blob();const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='zvona-crm-writeback.csv';link.click();URL.revokeObjectURL(link.href);return}}
     const blob = new Blob([toCrmCsv(routes.map(({ account, route }) => ({ account, route, outcome: account.id === 'astra' ? 'qualified' : '', nextAction: account.id === 'astra' ? 'route_to_ae' : 'nurture' })))], { type: 'text/csv;charset=utf-8' })
     const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'zvona-crm-writeback.csv'; link.click(); URL.revokeObjectURL(link.href)
   }
@@ -72,7 +76,7 @@ export function OperationsApp() {
     })
     const scoped = created.map((account) => ({ ...account, organizationId }))
     if (dataMode === 'postgres') {
-      const response = await fetch('/api/pilot/accounts', { method: 'POST', headers: { 'content-type': 'application/json', 'x-zvona-organization': organizationId }, body: JSON.stringify({ campaignId: campaign.id, accounts: scoped }) })
+      const response = await fetch('/api/pilot/accounts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ campaignId: campaign.id, accounts: scoped }) })
       if (!response.ok) return flash('CSV не сохранён: проверьте обязательные поля')
     }
     setAccounts((current) => [...current.filter((account) => !scoped.some((item) => item.externalId === account.externalId)), ...scoped]); flash(`Импортировано: ${scoped.length}`); setView('accounts')
@@ -88,7 +92,7 @@ export function OperationsApp() {
     <section className="workspace-main">
       <header className="topbar"><div><span className="crumb">Кампания / {nav.find((item) => item.id === view)?.label}</span><strong>{campaign.name}</strong></div><div className="top-actions"><span className={`readiness-badge ${campaignReadiness.band}`}><i /> Readiness {campaignReadiness.score}</span><button className="button secondary" onClick={downloadCsv}><Download size={16}/> CRM CSV</button></div></header>
       <main id="main" className="content">
-        {view === 'overview' && <Overview campaign={campaign} routes={routes} onNavigate={setView} />}
+        {view === 'overview' && <Overview campaign={campaign} routes={routes} analytics={analytics} onNavigate={setView} />}
         {view === 'campaign' && <CampaignEditor campaign={campaign} setCampaign={setCampaign} onSave={saveCampaignToServer} />}
         {view === 'accounts' && <AccountsView rows={routes} activeId={activeId} onSelect={(id) => { setActiveId(id); setView('task') }} importCsv={importCsv} />}
         {view === 'queue' && <QueueView rows={routes} onSelect={(id) => { setActiveId(id); setView('task') }} />}
@@ -100,17 +104,19 @@ export function OperationsApp() {
   </div>
 }
 
-function Overview({ campaign, routes, onNavigate }: { campaign: Campaign; routes: ReturnType<typeof rowsShape>; onNavigate: (view: View) => void }) {
+function Overview({ campaign, routes, analytics, onNavigate }: { campaign: Campaign; routes: ReturnType<typeof rowsShape>; analytics: Analytics | null; onNavigate: (view: View) => void }) {
   const ready = routes.filter((row) => row.readiness.band === 'ready').length
+  const countChannel = (channel: Channel) => routes.filter(row => row.route.channel === channel).length
+  const cost = analytics?.costPerQualifiedMicros == null ? '—' : `${new Intl.NumberFormat('ru-RU').format(Math.round(analytics.costPerQualifiedMicros / 1_000_000))} ₸`
   return <>
     <section className="page-heading"><div><span className="section-kicker">Operations overview</span><h1>От списка компаний до следующего действия</h1><p>Research, правила маршрутизации и контроль качества собраны в одном рабочем потоке.</p></div><button className="button primary" onClick={() => onNavigate('queue')}>Открыть очередь <ArrowRight size={17}/></button></section>
-    <section className="flow-strip"><FlowStep value={routes.length} label="Импортировано"/><FlowStep value={routes.length - 1} label="Исследовано"/><FlowStep value={ready} label="Готово"/><FlowStep value={1} label="SQL подтверждён"/><FlowStep value="18 400 ₸" label="Стоимость outcome"/></section>
+    <section className="flow-strip"><FlowStep value={analytics?.accounts.total ?? routes.length} label="Импортировано"/><FlowStep value={routes.filter(row=>row.account.triggers.length>0).length} label="Исследовано"/><FlowStep value={analytics?.accounts.ready ?? ready} label="Готово"/><FlowStep value={analytics?.tasks.qualified ?? 0} label="SQL подтверждён"/><FlowStep value={cost} label="Стоимость outcome"/></section>
     <div className="overview-grid">
       <section className="panel action-plan"><div className="panel-heading"><div><h2>Действия на сегодня</h2><p>Routing engine сформировал очередь по readiness и потенциалу.</p></div><span>12 июля</span></div>
-        <Action icon={Phone} count="18" label="ручных звонков" detail="6 для senior operator"/>
-        <Action icon={Mail} count="31" label="email-черновик" detail="требуют подтверждения"/>
-        <Action icon={MessageCircle} count="9" label="WhatsApp-черновиков" detail="без автоматической отправки"/>
-        <Action icon={Search} count="14" label="задач research" detail="не хватает данных"/>
+        <Action icon={Phone} count={String(countChannel('manual_call'))} label="ручных звонков" detail="по текущему routing"/>
+        <Action icon={Mail} count={String(countChannel('email_draft'))} label="email-черновик" detail="требуют подтверждения"/>
+        <Action icon={MessageCircle} count={String(countChannel('whatsapp_draft'))} label="WhatsApp-черновиков" detail="без автоматической отправки"/>
+        <Action icon={Search} count={String(countChannel('manual_research'))} label="задач research" detail="не хватает данных"/>
       </section>
       <section className="panel readiness-panel"><div className="panel-heading"><div><h2>Campaign readiness</h2><p>Execution разрешён, но два правила требуют внимания.</p></div><Gauge size={22}/></div><div className="score-row"><strong>{calculateCampaignReadiness(campaign).score}</strong><div><span>из 100</span><div className="meter"><i style={{ width: `${calculateCampaignReadiness(campaign).score}%` }}/></div></div></div>{calculateCampaignReadiness(campaign).factors.slice(-4).map((factor) => <div className="check-row" key={factor.label}><span className={factor.passed ? 'pass' : 'fail'}>{factor.passed ? <Check size={14}/> : <CircleAlert size={14}/>}</span><span>{factor.label}</span><strong>+{factor.points}</strong></div>)}<button className="text-button" onClick={() => onNavigate('campaign')}>Открыть правила <ChevronRight size={15}/></button></section>
     </div>
