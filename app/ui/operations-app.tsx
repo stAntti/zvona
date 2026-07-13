@@ -2,10 +2,9 @@
 
 import { useMemo, useState, type ChangeEvent } from 'react'
 import {
-  ArrowLeft, ArrowRight, BarChart3, BriefcaseBusiness, Building2, Check, ChevronRight,
+  ArrowLeft, ArrowRight, BarChart3, Building2, Check, ChevronRight,
   CircleAlert, CircleDollarSign, ClipboardCheck, FileSpreadsheet, Gauge, Headphones,
-  LayoutDashboard, ListChecks, Phone, Play, Search, Sparkles, Target, Upload, UserRound,
-  Users, X,
+  LayoutDashboard, ListChecks, Phone, Play, Sparkles, Target, Upload, UserRound, X,
 } from 'lucide-react'
 import { demoAccounts, demoCampaign } from '@/lib/fixtures'
 import { importAccountsFile } from '@/lib/excel-import'
@@ -20,6 +19,7 @@ type CallResult = {
   decisionMaker: boolean
   activeNeed: boolean
   agreedNextStep: boolean
+  askedQuestions: boolean[]
   quality: number
   payout: number
   completedAt: string
@@ -39,6 +39,7 @@ const operatorNav = [
 ]
 
 const money = (value: number) => `${new Intl.NumberFormat('ru-RU').format(value)} ₸`
+const mandatoryQuestions = ['Как сейчас решаете эту задачу?', 'Кто участвует в выборе?', 'Какой срок и ориентир бюджета?']
 
 export function OperationsApp() {
   const [role, setRole] = useState<Role>('manager')
@@ -97,7 +98,8 @@ export function OperationsApp() {
 
   const completeCall = (input: Omit<CallResult, 'accountId' | 'quality' | 'payout' | 'completedAt'>) => {
     const evidenceCount = Number(input.decisionMaker) + Number(input.activeNeed) + Number(input.agreedNextStep)
-    const quality = 64 + evidenceCount * 10
+    const missedQuestions = mandatoryQuestions.length - input.askedQuestions.filter(Boolean).length
+    const quality = Math.max(0, 64 + evidenceCount * 10 - missedQuestions * 4)
     const result: CallResult = {
       ...input,
       accountId: selected.id,
@@ -148,7 +150,7 @@ export function OperationsApp() {
   const nav = role === 'manager' ? managerNav : operatorNav
 
   return <div className="app-shell">
-    <aside className="sidebar">
+    <aside className={`sidebar ${role}`}>
       <button className="brand" onClick={() => { setRole('manager'); setView('overview') }}><span>Z</span><strong>ZVONA<small>команда продаж</small></strong></button>
       <div className="role-switch" aria-label="Роль в демо">
         <button className={role === 'manager' ? 'active' : ''} onClick={() => switchRole('manager')}>Руководитель</button>
@@ -162,7 +164,7 @@ export function OperationsApp() {
     <section className="workspace-main">
       <header className="topbar">
         <div><span className="crumb">{role === 'manager' ? 'Кабинет руководителя' : 'Рабочее место оператора'}</span><strong>{nav.find(item => item.id === view)?.label ?? (view === 'company' ? 'Карточка компании' : view === 'call' ? 'Демонстрационный звонок' : view === 'qa' ? 'Разбор звонка' : 'Запуск кампании')}</strong></div>
-        <div className="top-actions"><span className="demo-badge"><Sparkles size={14}/> Демо на выдуманных данных</span><button className="avatar" aria-label="Профиль">ДМ</button></div>
+        <div className="top-actions"><span className="demo-badge"><Sparkles size={14}/> Демо на выдуманных данных</span><button className="mobile-role-switch" onClick={() => switchRole(role === 'manager' ? 'operator' : 'manager')}><UserRound size={15}/>{role === 'manager' ? 'К оператору' : 'К руководителю'}</button></div>
       </header>
 
       <main id="main" className="content">
@@ -174,7 +176,7 @@ export function OperationsApp() {
         {view === 'onboarding' && <Onboarding step={onboardingStep} campaign={campaign} importing={importing} error={importError} onStep={setOnboardingStep} onCampaign={setCampaign} onImport={handleImport} onExample={openExample} onClose={() => setView('overview')} />}
         {view === 'shift' && <ShiftView queue={queuedAccounts} results={results} earnings={earnings} onStart={() => queuedAccounts[0] ? startCall(queuedAccounts[0].id) : setView('queue')} onQueue={() => setView('queue')} />}
         {view === 'queue' && <CallQueue accounts={queuedAccounts} allAccounts={accounts} onStart={startCall} onOpen={openCompany} />}
-        {view === 'earnings' && <EarningsView results={results} accounts={accounts} total={earnings} />}
+        {view === 'earnings' && <EarningsView results={results} accounts={accounts} total={earnings} onStart={() => setView('queue')} />}
         {view === 'call' && <OperatorCall account={selected} onBack={() => setView('queue')} onComplete={completeCall} />}
         {view === 'qa' && lastResult && <QaView result={lastResult} account={selected} next={nextAfterCall} onNext={(id) => startCall(id)} onDashboard={() => { setRole('manager'); setView('overview') }} onResults={() => { setRole('manager'); setView('results') }} />}
       </main>
@@ -230,15 +232,18 @@ function Onboarding({ step, campaign, importing, error, onStep, onCampaign, onIm
 
 function ShiftView({ queue, results, earnings, onStart, onQueue }: { queue: Account[]; results: CallResult[]; earnings: number; onStart: () => void; onQueue: () => void }) {
   const next = queue[0]
-  return <><section className="page-heading operator-heading"><div><span className="section-label">Смена оператора</span><h1>{next ? 'Следующая компания подготовлена' : 'Очередь на сегодня завершена'}</h1><p>{next ? 'Досье, цель разговора и подсказки уже собраны. Вам остаётся провести разговор и зафиксировать результат.' : 'Можно вернуться к руководителю и добавить новые компании.'}</p></div>{next && <button className="button primary hero-action" onClick={onStart}><Headphones size={17}/> Начать звонок</button>}</section><section className="shift-stats"><Metric value={queue.length} label="Осталось звонков"/><Metric value={results.length} label="Завершено"/><div><strong>{money(earnings)}</strong><span>Начислено за смену</span></div></section>{next ? <section className="next-call"><div className="company-monogram">{next.name.slice(0, 2).toUpperCase()}</div><div><span>Следующий звонок</span><h2>{next.name}</h2><p>{next.aiSummary}</p><small>{next.contacts[0]?.value ?? 'Демонстрационный звонок · связь не устанавливается'}</small></div><button className="button secondary" onClick={onQueue}>Открыть очередь <ChevronRight size={16}/></button></section> : <EmptyState icon={Check} title="Смена завершена" text="Все компании из очереди обработаны." action="Посмотреть очередь" onAction={onQueue}/>}</>
+  const hasResults = results.length > 0
+  const emptyTitle = hasResults ? 'Очередь на сегодня завершена' : 'Очередь пока пуста'
+  const emptyText = hasResults ? 'Все компании из очереди обработаны. Результаты уже доступны руководителю.' : 'Выберите первую компанию — досье и сценарий звонка уже подготовлены.'
+  return <><section className="page-heading operator-heading"><div><span className="section-label">Смена оператора</span><h1>{next ? 'Следующая компания подготовлена' : emptyTitle}</h1><p>{next ? 'Досье, цель разговора и подсказки уже собраны. Вам остаётся провести разговор и зафиксировать результат.' : emptyText}</p></div>{next && <button className="button primary hero-action" onClick={onStart}><Headphones size={17}/> Начать звонок</button>}</section><section className="shift-stats"><Metric value={queue.length} label="Осталось звонков"/><Metric value={results.length} label="Завершено"/><div><strong>{money(earnings)}</strong><span>Начислено за смену</span></div></section>{next ? <section className="next-call"><div className="company-monogram">{next.name.slice(0, 2).toUpperCase()}</div><div><span>Следующий звонок</span><h2>{next.name}</h2><p>{next.aiSummary}</p><small>{next.contacts[0]?.value ?? 'Демонстрационный звонок · связь не устанавливается'}</small></div><button className="button secondary" onClick={onQueue}>Открыть очередь <ChevronRight size={16}/></button></section> : <EmptyState icon={hasResults ? Check : Phone} title={emptyTitle} text={emptyText} action={hasResults ? 'Посмотреть звонки' : 'Выбрать компанию'} onAction={onQueue}/>}</>
 }
 
 function CallQueue({ accounts, allAccounts, onStart, onOpen }: { accounts: Account[]; allAccounts: Account[]; onStart: (id: string) => void; onOpen: (id: string) => void }) {
   return <><section className="page-heading compact"><div><span className="section-label">Мои звонки</span><h1>Очередь на сегодня</h1><p>Сверху — компания, с которой лучше начать прямо сейчас.</p></div></section>{accounts.length ? <section className="operator-queue">{accounts.map((account, index) => <article key={account.id} className={index === 0 ? 'next' : ''}><span className="queue-number">{index + 1}</span><div className="company-monogram small">{account.name.slice(0, 2).toUpperCase()}</div><div><strong>{account.name}</strong><small>{account.city ?? account.region} · {account.employeeRange ?? 'Размер не указан'}</small></div><div className="queue-why"><span>Почему звоним</span><p>{account.triggers[0] ?? 'Подходит по масштабу и географии кампании'}</p></div><button className="button primary" onClick={() => onStart(account.id)}>{index === 0 ? 'Начать' : 'Открыть'} <ArrowRight size={15}/></button></article>)}</section> : <EmptyState icon={Phone} title="Очередь пока пуста" text="Вернитесь к списку компаний и добавьте компанию для демонстрационного звонка." action="Выбрать компанию" onAction={() => allAccounts[0] && onOpen(allAccounts[0].id)}/>}</>
 }
 
-function EarningsView({ results, accounts, total }: { results: CallResult[]; accounts: Account[]; total: number }) {
-  return <><section className="page-heading compact"><div><span className="section-label">Заработок оператора</span><h1>{money(total)}</h1><p>Демонстрационный расчёт зависит от качества разговора, а не от согласия клиента купить.</p></div></section><section className="earning-info"><div><span>Базовая ставка</span><strong>900 ₸</strong></div><div><span>Хорошее качество</span><strong>1 350 ₸</strong></div><div><span>Отличное качество</span><strong>1 750 ₸</strong></div></section>{results.length > 0 && <section className="earning-list">{results.map(result => <div key={result.accountId}><span><strong>{accounts.find(account => account.id === result.accountId)?.name}</strong><small>Оценка звонка: {result.quality}/100</small></span><strong>{money(result.payout)}</strong></div>)}</section>}</>
+function EarningsView({ results, accounts, total, onStart }: { results: CallResult[]; accounts: Account[]; total: number; onStart: () => void }) {
+  return <><section className="page-heading compact"><div><span className="section-label">Заработок оператора</span><h1>{money(total)}</h1><p>Демонстрационный расчёт зависит от качества разговора, а не от согласия клиента купить.</p></div></section><section className="earning-info"><div><span>Базовая ставка</span><strong>900 ₸</strong></div><div><span>Хорошее качество</span><strong>1 350 ₸</strong></div><div><span>Отличное качество</span><strong>1 750 ₸</strong></div></section>{results.length > 0 ? <section className="earning-list">{results.map(result => <div key={result.accountId}><span><strong>{accounts.find(account => account.id === result.accountId)?.name}</strong><small>Оценка звонка: {result.quality}/100</small></span><strong>{money(result.payout)}</strong></div>)}</section> : <EmptyState icon={CircleDollarSign} title="Начислений пока нет" text="Проведите первый демонстрационный звонок — сумма появится сразу после разбора." action="Перейти к звонкам" onAction={onStart}/>}</>
 }
 
 function OperatorCall({ account, onBack, onComplete }: { account: Account; onBack: () => void; onComplete: (result: Omit<CallResult, 'accountId' | 'quality' | 'payout' | 'completedAt'>) => void }) {
@@ -247,6 +252,7 @@ function OperatorCall({ account, onBack, onComplete }: { account: Account; onBac
   const [decisionMaker, setDecisionMaker] = useState(true)
   const [activeNeed, setActiveNeed] = useState(true)
   const [agreedNextStep, setAgreedNextStep] = useState(true)
+  const [askedQuestions, setAskedQuestions] = useState([true, true, false])
   const contact = account.contacts[0]
   const transcript = useMemo(() => [
     ['Оператор', `Здравствуйте! Подскажите, кто у вас отвечает за корпоративные подарки для сотрудников и партнёров?`],
@@ -254,13 +260,33 @@ function OperatorCall({ account, onBack, onComplete }: { account: Account; onBac
     ['Оператор', 'Подбираем и доставляем брендированные наборы по Казахстану под согласованный бюджет и сроки.'],
     ['Клиент', 'Пришлите примеры. Нам может понадобиться около 300 наборов к ноябрю.'],
   ], [])
-  return <><button className="back-button" onClick={onBack}><ArrowLeft size={16}/> Вернуться в очередь</button><section className="call-header"><div><span className="live-indicator"><i/> Демонстрационный звонок</span><h1>{account.name}</h1><p>{contact?.value ?? 'Контакт ещё не найден · реальная связь не устанавливается'}</p></div><div className="call-timer"><Phone size={16}/><strong>02:34</strong></div></section><div className="operator-layout"><section className="call-main"><article className="call-company"><div className="company-monogram small">{account.name.slice(0, 2).toUpperCase()}</div><div><span>Краткое AI-досье</span><p>{account.aiSummary}</p></div></article><article className="conversation-goal"><span>Цель разговора</span><strong>Найти ответственного, подтвердить потребность и договориться о следующем шаге</strong></article><article className="say-now"><span><Sparkles size={16}/> Скажите сейчас</span><p>«Подскажите, какой объём наборов вы рассматриваете и к какой дате они должны быть готовы?»</p></article><article className="transcript"><div className="section-row"><div><span>Разговор</span><h2>Демонстрационный транскрипт</h2></div><small>появляется по ходу звонка</small></div>{transcript.map(([speaker, text], index) => <div className={`transcript-line ${speaker === 'Оператор' ? 'operator' : ''}`} key={index}><span>{speaker}</span><p>{text}</p></div>)}</article></section><aside className="call-assistant"><section><h2>Обязательные вопросы</h2>{['Как сейчас решаете эту задачу?', 'Кто участвует в выборе?', 'Какой срок и ориентир бюджета?'].map((question, index) => <label className="call-check" key={question}><input type="checkbox" defaultChecked={index < 2}/><span>{question}</span></label>)}</section><section className="objection"><span>Типовое возражение</span><strong>«У нас уже есть поставщик»</strong><p>Разрешённый ответ: «Понимаю. Можно уточнить, что для вас важнее всего при выборе — срок, состав или бюджет?»</p></section><section className="call-result"><h2>Результат разговора</h2><label>Итог<select value={outcome} onChange={event => setOutcome(event.target.value)}><option>Интерес есть</option><option>Перезвонить позже</option><option>Неверный контакт</option><option>Неактуально</option></select></label><label className="evidence-check"><input type="checkbox" checked={decisionMaker} onChange={event => setDecisionMaker(event.target.checked)}/> Найден ответственный</label><label className="evidence-check"><input type="checkbox" checked={activeNeed} onChange={event => setActiveNeed(event.target.checked)}/> Есть актуальная потребность</label><label className="evidence-check"><input type="checkbox" checked={agreedNextStep} onChange={event => setAgreedNextStep(event.target.checked)}/> Согласован следующий шаг</label><label>Заметки<textarea value={notes} onChange={event => setNotes(event.target.value)} placeholder="Что важно передать менеджеру"/></label><button className="button primary wide" onClick={() => onComplete({ outcome, notes, decisionMaker, activeNeed, agreedNextStep })}>Завершить и получить разбор <ArrowRight size={16}/></button></section></aside></div></>
+  const changeOutcome = (value: string) => {
+    setOutcome(value)
+    if (value === 'Неверный контакт') {
+      setDecisionMaker(false)
+      setActiveNeed(false)
+      setAgreedNextStep(false)
+    } else if (value === 'Неактуально') {
+      setDecisionMaker(true)
+      setActiveNeed(false)
+      setAgreedNextStep(false)
+    } else {
+      setDecisionMaker(true)
+      setActiveNeed(true)
+      setAgreedNextStep(true)
+    }
+  }
+  const toggleQuestion = (index: number, checked: boolean) => setAskedQuestions(current => current.map((value, itemIndex) => itemIndex === index ? checked : value))
+  return <><button className="back-button" onClick={onBack}><ArrowLeft size={16}/> Вернуться в очередь</button><section className="call-header"><div><span className="live-indicator"><i/> Демонстрационный звонок</span><h1>{account.name}</h1><p>{contact?.value ?? 'Контакт ещё не найден · реальная связь не устанавливается'}</p></div><div className="call-timer"><Phone size={16}/><strong>02:34</strong></div></section><div className="operator-layout"><section className="call-main"><article className="call-company"><div className="company-monogram small">{account.name.slice(0, 2).toUpperCase()}</div><div><span>Краткое AI-досье</span><p>{account.aiSummary}</p></div></article><article className="conversation-goal"><span>Цель разговора</span><strong>Найти ответственного, подтвердить потребность и договориться о следующем шаге</strong></article><article className="say-now"><span><Sparkles size={16}/> Скажите сейчас</span><p>«Подскажите, какой объём наборов вы рассматриваете и к какой дате они должны быть готовы?»</p></article><article className="transcript"><div className="section-row"><div><span>Разговор</span><h2>Демонстрационный транскрипт</h2></div><small>появляется по ходу звонка</small></div>{transcript.map(([speaker, text], index) => <div className={`transcript-line ${speaker === 'Оператор' ? 'operator' : ''}`} key={index}><span>{speaker}</span><p>{text}</p></div>)}</article></section><aside className="call-assistant"><section><h2>Обязательные вопросы</h2>{mandatoryQuestions.map((question, index) => <label className="call-check" key={question}><input type="checkbox" checked={askedQuestions[index]} onChange={event => toggleQuestion(index, event.target.checked)}/><span>{question}</span></label>)}</section><section className="objection"><span>Типовое возражение</span><strong>«У нас уже есть поставщик»</strong><p>Разрешённый ответ: «Понимаю. Можно уточнить, что для вас важнее всего при выборе — срок, состав или бюджет?»</p></section><section className="call-result"><h2>Результат разговора</h2><label>Итог<select value={outcome} onChange={event => changeOutcome(event.target.value)}><option>Интерес есть</option><option>Перезвонить позже</option><option>Неверный контакт</option><option>Неактуально</option></select></label><label className="evidence-check"><input type="checkbox" checked={decisionMaker} onChange={event => setDecisionMaker(event.target.checked)}/> Найден ответственный</label><label className="evidence-check"><input type="checkbox" checked={activeNeed} onChange={event => setActiveNeed(event.target.checked)}/> Есть актуальная потребность</label><label className="evidence-check"><input type="checkbox" checked={agreedNextStep} onChange={event => setAgreedNextStep(event.target.checked)}/> Согласован следующий шаг</label><label>Заметки<textarea value={notes} onChange={event => setNotes(event.target.value)} placeholder="Что важно передать менеджеру"/></label><button className="button primary wide" onClick={() => onComplete({ outcome, notes, decisionMaker, activeNeed, agreedNextStep, askedQuestions })}>Завершить и получить разбор <ArrowRight size={16}/></button></section></aside></div></>
 }
 
 function QaView({ result, account, next, onNext, onDashboard, onResults }: { result: CallResult; account: Account; next?: Account; onNext: (id: string) => void; onDashboard: () => void; onResults: () => void }) {
   const learned = [result.decisionMaker ? 'Подтверждён ответственный за решение' : '', result.activeNeed ? 'Есть актуальная потребность' : '', result.agreedNextStep ? 'Согласован следующий шаг' : ''].filter(Boolean)
-  const missed = [!result.decisionMaker ? 'Не найден ответственный' : '', !result.activeNeed ? 'Не подтверждена потребность' : '', !result.agreedNextStep ? 'Нет договорённости о следующем шаге' : ''].filter(Boolean)
-  return <><section className="qa-hero"><div><span>Разбор готов</span><h1>{account.name}</h1><p>Звонок завершён, результат добавлен в показатели кампании.</p></div><div className="qa-grade"><strong>{result.quality}</strong><span>из 100</span></div></section><div className="qa-simple-grid"><section><h2>Что удалось выяснить</h2>{learned.map(item => <div className="qa-point good" key={item}><Check size={16}/>{item}</div>)}</section><section><h2>Что сделано хорошо</h2><div className="qa-point good"><Check size={16}/>Разговор начат с понятной цели</div><div className="qa-point good"><Check size={16}/>Зафиксирован конкретный результат</div><div className="qa-point good"><Check size={16}/>Не использованы запрещённые обещания</div></section><section><h2>Что можно улучшить</h2>{missed.length ? missed.map(item => <div className="qa-point warn" key={item}><CircleAlert size={16}/>{item}</div>) : <div className="qa-point good"><Check size={16}/>Все обязательные результаты зафиксированы</div>}<div className="qa-point warn"><CircleAlert size={16}/>Уточнить, кто финально утверждает бюджет</div></section></div><section className="qa-next"><div><span>Следующий шаг</span><h2>{result.decisionMaker && result.activeNeed && result.agreedNextStep ? 'Передать лид менеджеру и отправить примеры наборов' : 'Уточнить недостающие данные'}</h2><p>Начисление оператору за качество разговора: <strong>{money(result.payout)}</strong></p></div><div>{next && <button className="button secondary" onClick={() => onNext(next.id)}>Следующая компания <ArrowRight size={16}/></button>}<button className="button secondary" onClick={onResults}>Открыть результаты</button><button className="button primary" onClick={onDashboard}>Вернуться на главную</button></div></section></>
+  const missedEvidence = [!result.decisionMaker ? 'Не найден ответственный' : '', !result.activeNeed ? 'Не подтверждена потребность' : '', !result.agreedNextStep ? 'Нет договорённости о следующем шаге' : ''].filter(Boolean)
+  const missedQuestions = mandatoryQuestions.filter((_, index) => !result.askedQuestions[index]).map(question => `Не задан вопрос: «${question}»`)
+  const missed = [...missedEvidence, ...missedQuestions]
+  const nextStep = result.outcome === 'Неверный контакт' ? 'Вернуть компанию на поиск правильного контакта' : result.outcome === 'Неактуально' ? 'Исключить компанию из текущей кампании' : result.decisionMaker && result.activeNeed && result.agreedNextStep ? 'Передать лид менеджеру и отправить примеры наборов' : 'Уточнить недостающие данные'
+  return <><section className="qa-hero"><div><span>Разбор готов</span><h1>{account.name}</h1><p>Звонок завершён, результат добавлен в показатели кампании.</p></div><div className="qa-grade"><strong>{result.quality}</strong><span>из 100</span></div></section><div className="qa-simple-grid"><section><h2>Что удалось выяснить</h2>{learned.length ? learned.map(item => <div className="qa-point good" key={item}><Check size={16}/>{item}</div>) : <div className="qa-point neutral"><CircleAlert size={16}/>Полезные факты пока не подтверждены</div>}</section><section><h2>Что сделано хорошо</h2><div className="qa-point good"><Check size={16}/>Разговор начат с понятной цели</div><div className="qa-point good"><Check size={16}/>Зафиксирован конкретный исход</div><div className="qa-point good"><Check size={16}/>Не использованы запрещённые обещания</div></section><section><h2>Что можно улучшить</h2>{missed.length ? missed.map(item => <div className="qa-point warn" key={item}><CircleAlert size={16}/>{item}</div>) : <div className="qa-point good"><Check size={16}/>Все обязательные вопросы и результаты зафиксированы</div>}</section></div><section className="qa-next"><div><span>Следующий шаг</span><h2>{nextStep}</h2><p>Начисление оператору за качество разговора: <strong>{money(result.payout)}</strong></p></div><div>{next && <button className="button secondary" onClick={() => onNext(next.id)}>Следующая компания <ArrowRight size={16}/></button>}<button className="button secondary" onClick={onResults}>Открыть результаты</button><button className="button primary" onClick={onDashboard}>Вернуться на главную</button></div></section></>
 }
 
 function EmptyState({ icon: Icon, title, text, action, onAction }: { icon: typeof Phone; title: string; text: string; action: string; onAction: () => void }) { return <section className="empty-state"><span><Icon size={24}/></span><h2>{title}</h2><p>{text}</p><button className="button primary" onClick={onAction}>{action} <ArrowRight size={16}/></button></section> }
