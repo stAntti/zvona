@@ -51,6 +51,15 @@ export interface Account {
   personaConfidence: number
   potential: number
   contacts: ContactPoint[]
+  bin?: string
+  oked?: string
+  employeeRange?: string
+  city?: string
+  address?: string
+  leaderName?: string
+  registrationDate?: string
+  aiSummary?: string
+  unknowns?: string[]
 }
 
 export interface ScoreResult {
