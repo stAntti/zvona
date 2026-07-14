@@ -7,18 +7,22 @@ const key = (value: Cell) => clean(value).toLowerCase().replaceAll('ё', 'е').r
 
 const headerNames = {
   bin: ['бин'],
-  name: ['полное наименование', 'толық атауы'],
-  industry: ['наименование основного вида деятельности', 'негізгі қызмет түрінің атауы'],
+  name: ['полное наименование', 'наименование', 'толық атауы'],
+  industry: ['наименование основного вида деятельности', 'вид деятельности', 'негізгі қызмет түрінің атауы'],
   oked: ['окэд'],
-  size: ['наименование крп', 'ккж атауы'],
-  city: ['наименование населенного пункта', 'елді мекеннің атауы'],
-  address: ['заңды мекен-жайы, юридический адрес', 'юридический адрес'],
-  leader: ['басшының таә, фио руководителя', 'фио руководителя'],
+  size: ['наименование крп', 'размер предприятия', 'ккж атауы'],
+  city: ['наименование населенного пункта', 'населенный пункт', 'населённый пункт', 'елді мекеннің атауы'],
+  address: ['заңды мекен-жайы, юридический адрес', 'юридический адрес', 'юр.адрес', 'юр адрес'],
+  leader: ['басшының таә, фио руководителя', 'фио руководителя', 'руководитель'],
   registered: ['дата регистрации'],
+  phone: ['тел./факс', 'телефон/факс', 'телефон', 'телефоны'],
+  email: ['e-mail', 'email', 'электронная почта'],
+  website: ['сайт', 'website'],
 } as const
 
 function findColumn(headers: Cell[], names: readonly string[]) {
-  return headers.findIndex(header => names.some(name => key(header) === name || key(header).includes(name)))
+  const exact = headers.findIndex(header => names.some(name => key(header) === name))
+  return exact >= 0 ? exact : headers.findIndex(header => names.some(name => key(header).includes(name)))
 }
 
 function getValue(row: Cell[], headers: Cell[], names: readonly string[]) {
@@ -40,6 +44,29 @@ function makeSummary(name: string, industry: string, size: string, city: string,
     'Перед звонком нужно подтвердить контакт, потребность и ответственного за закупку.',
   ]
   return parts.filter(Boolean).join(' ')
+}
+
+function makeContacts(row: Cell[], headers: Cell[], rowId: string) {
+  const discoveredAt = new Date().toISOString().slice(0, 10)
+  const phone = getValue(row, headers, headerNames.phone).replace(/\s+/g, ' ').trim()
+  const emailCell = getValue(row, headers, headerNames.email)
+  const emails = [...new Set(emailCell.match(/[\w.%+-]+@[\w.-]+\.[a-z]{2,}/gi) ?? [])]
+  const contacts: Account['contacts'] = []
+
+  if ((phone.match(/\d/g) ?? []).length >= 5) {
+    contacts.push({
+      id: `${rowId}-phone`, type: 'phone', value: phone, sourceType: 'csv',
+      sourceLabel: 'Импорт Excel · телефон', discoveredAt, confidence: .8,
+      consent: 'unknown', suppressed: false,
+    })
+  }
+  emails.forEach((email, index) => contacts.push({
+    id: `${rowId}-email-${index}`, type: 'email', value: email, sourceType: 'csv',
+    sourceLabel: 'Импорт Excel · email', discoveredAt, confidence: .8,
+    consent: 'unknown', suppressed: false,
+  }))
+
+  return contacts
 }
 
 export interface ExcelImportResult {
@@ -66,13 +93,15 @@ export async function importAccountsFile(file: File): Promise<ExcelImportResult>
       const size = employeeRange(getValue(row, headers, headerNames.size))
       const city = getValue(row, headers, headerNames.city)
       const leaderName = getValue(row, headers, headerNames.leader)
+      const rowId = `excel-${Date.now()}-${index}`
+      const contacts = makeContacts(row, headers, rowId)
       return {
-        id: `excel-${Date.now()}-${index}`,
+        id: rowId,
         organizationId: 'demo-session',
         externalId: bin || `ROW-${index + 1}`,
         bin,
         name: name || `Компания ${index + 1}`,
-        domain: '',
+        domain: getValue(row, headers, headerNames.website),
         industry,
         oked: getValue(row, headers, headerNames.oked),
         employeeRange: size,
@@ -87,9 +116,13 @@ export async function importAccountsFile(file: File): Promise<ExcelImportResult>
         persona: leaderName ? 'Руководитель компании' : 'Ответственный требует уточнения',
         personaConfidence: leaderName ? .55 : .2,
         potential: 0,
-        contacts: [],
+        contacts,
         aiSummary: makeSummary(name || `Компания ${index + 1}`, industry, size, city, leaderName),
-        unknowns: ['Рабочий телефон или email', 'Ответственный за корпоративные закупки', 'Актуальная потребность и бюджет'],
+        unknowns: [
+          contacts.length ? '' : 'Рабочий телефон или email',
+          'Ответственный за корпоративные закупки',
+          'Актуальная потребность и бюджет',
+        ].filter(Boolean),
       }
     }).filter((account): account is Account => Boolean(account))
 
