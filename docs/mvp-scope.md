@@ -10,7 +10,7 @@
 - Версионированная task card и snapshot для QA.
 - Qualification evidence и next-best-action.
 - CSV intake в интерфейсе и CRM-ready CSV export.
-- OpenAI server adapter со Structured Outputs для evidence-bound research.
+- Kimi server adapter со Structured Outputs для evidence-bound research; OpenAI остаётся fallback-провайдером.
 - PostgreSQL job queue, отдельный worker, audit events и AI usage schema.
 - Tenant-scoped persistence API для campaign state и идемпотентного CSV import.
 - Managed invite authentication и HttpOnly tenant sessions.

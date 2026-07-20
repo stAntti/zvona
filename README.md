@@ -16,6 +16,16 @@ npm run dev
 
 Откройте `http://localhost:3000`. При запущенном Compose campaign и CSV imports сохраняются в PostgreSQL. Без PostgreSQL интерфейс явно переключается на выдуманные fixtures. API-ключ хранится только в `.env.local`, который исключён из Git и Docker build context.
 
+Для AI research основной провайдер — Kimi. Добавьте в `.env.local`:
+
+```text
+KIMI_API_KEY=your-key
+KIMI_MODEL=kimi-k2.6
+KIMI_BASE_URL=https://api.moonshot.ai/v1
+```
+
+Если `KIMI_API_KEY` не задан, приложение использует `OPENAI_API_KEY` как fallback. Ключи нельзя добавлять в `.env.example` или другие отслеживаемые Git файлы.
+
 ## Production-like запуск
 
 ```bash

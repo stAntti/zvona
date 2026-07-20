@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { Sql } from 'postgres'
 import { fetchPublicText } from './safe-fetch'
-import { researchWithOpenAI } from './ai'
+import { getAIStatus, researchWithAI } from './ai'
 import { cleanupExpiredArtifacts } from './object-store'
 
 const researchJob=z.object({accountId:z.string().uuid(),url:z.string().url()})
@@ -12,11 +12,12 @@ export type SupportedJob='research.account'|'draft.prepare'|'qa.review'
 export async function handleJob(db:Sql,job:{id:string;organizationId:string;type:string;payload:unknown}){
   if(job.type==='artifact.cleanup')return cleanupExpiredArtifacts()
   if(job.type==='research.account'){
-    const payload=researchJob.parse(job.payload);const source=await fetchPublicText(payload.url);const output=await researchWithOpenAI(source.text)
+    const payload=researchJob.parse(job.payload);const source=await fetchPublicText(payload.url);const output=await researchWithAI(source.text)
     const rows=await db<Array<{profile:Record<string,unknown>}>>`select profile from accounts where id=${payload.accountId} and organization_id=${job.organizationId}`;if(!rows[0])throw new Error('Account not found in organization')
     const profile={...rows[0].profile,research:output,researchSource:{url:source.url,retrievedAt:source.retrievedAt}}
     await db`update accounts set profile=${db.json(profile)} where id=${payload.accountId} and organization_id=${job.organizationId}`
-    await db`insert into ai_runs(organization_id,task_type,model,prompt_version,source_refs,structured_output) values(${job.organizationId},'research.account',${process.env.OPENAI_MODEL??'gpt-5.4-mini'},'research-v1',${db.json([{url:source.url,retrievedAt:source.retrievedAt}])},${db.json(output)})`
+    const ai=getAIStatus()
+    await db`insert into ai_runs(organization_id,task_type,model,prompt_version,source_refs,structured_output) values(${job.organizationId},'research.account',${ai.model??'not-configured'},'research-v1',${db.json([{url:source.url,retrievedAt:source.retrievedAt}])},${db.json(output)})`
     return {accountId:payload.accountId,confidence:output.confidence}
   }
   if(job.type==='draft.prepare'){
