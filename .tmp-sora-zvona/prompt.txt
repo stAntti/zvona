@@ -1,0 +1,17 @@
+Use case: 12-second vertical B2B SaaS sales advertisement for ZVONA.
+Primary request: A fictional Russian-speaking female sales director delivers a concise pitch directly to camera with natural synchronized speech.
+Scene/background: Modern premium sales operations office, clean warm-gray interior, subtle amber accent lights, softly blurred workstations and call analytics screens in the background. No readable interface text and no logos.
+Subject: Fictional adult woman, 34-38 years old, credible B2B sales leader, intelligent and approachable, dark tailored blazer over a cream blouse, understated professional styling. She must not resemble any real person.
+Action: One continuous take. She maintains direct eye contact, speaks confidently, makes one restrained open-hand gesture near the middle, then ends with a calm assured expression.
+Camera: Vertical 9:16, medium close-up, eye level, 70mm portrait lens, locked camera with an extremely subtle slow push-in.
+Lighting/mood: Soft window key light, gentle warm rim light, premium and trustworthy, modern B2B commercial.
+Color palette: warm gray, cream, charcoal, muted amber.
+Style/format: Photorealistic premium startup commercial, natural skin texture, realistic facial motion and accurate Russian lip sync.
+Timing/beats: 0-1s direct eye contact and first phrase; 1-9s full value proposition; 9-12s final two short lines and confident finish.
+Audio: Clean close-mic Russian female voice, warm, confident and articulate, brisk but natural sales-demo pace. Very light office room tone, no music.
+Dialogue:
+<dialogue>
+- Speaker: "ZVONA превращает холодные звонки в управляемые продажи. Подсказывает, кому звонить, что сказать и когда передать лид менеджеру. Без хаоса. Без потерянных клиентов."
+</dialogue>
+Constraints: Exactly one fictional adult speaker. Keep the spoken wording verbatim. No subtitles, no on-screen text, no logo, no watermark added inside the scene.
+Avoid: celebrity resemblance, real-person likeness, beauty-ad styling, beach imagery, exaggerated gestures, camera shake, facial warping, hand artifacts, lip-sync drift, background voices.

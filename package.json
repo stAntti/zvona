@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "video:preview": "npm --prefix video run preview",
+    "video:render": "npm --prefix video run render",
+    "video:render:silent": "npm --prefix video run render:silent",
     "start": "next start",
     "worker": "tsx worker/index.ts",
     "invite": "tsx scripts/create-invite.ts",
