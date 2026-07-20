@@ -1,0 +1,12 @@
+import {AbsoluteFill,Audio,Sequence,staticFile} from 'remotion';
+import {BrandScene} from './scenes/BrandScene';
+import {CopilotScene} from './scenes/CopilotScene';
+import {FinaleScene} from './scenes/FinaleScene';
+import {ManagerScene} from './scenes/ManagerScene';
+import {PrepareScene} from './scenes/PrepareScene';
+import {ProblemScene} from './scenes/ProblemScene';
+import {QualityScene} from './scenes/QualityScene';
+import {SCENES} from './utils/timing';
+export type ZvonaLaunchProps={audioEnabled:boolean};
+const tracks=[{file:'audio/atmosphere.wav',from:0,volume:.22},{file:'audio/brand-impact.wav',from:10,volume:.5},{file:'audio/scan.wav',from:127,volume:.35},{file:'audio/click.wav',from:278,volume:.28},{file:'audio/score-hit.wav',from:382,volume:.42},{file:'audio/final-hit.wav',from:566,volume:.5}] as const;
+export const ZvonaLaunch:React.FC<ZvonaLaunchProps>=({audioEnabled})=><AbsoluteFill style={{background:'#02050a'}}><Sequence from={SCENES.brand.from} durationInFrames={SCENES.brand.duration}><BrandScene/></Sequence><Sequence from={SCENES.problem.from} durationInFrames={SCENES.problem.duration}><ProblemScene/></Sequence><Sequence from={SCENES.prepare.from} durationInFrames={SCENES.prepare.duration}><PrepareScene/></Sequence><Sequence from={SCENES.copilot.from} durationInFrames={SCENES.copilot.duration}><CopilotScene/></Sequence><Sequence from={SCENES.quality.from} durationInFrames={SCENES.quality.duration}><QualityScene/></Sequence><Sequence from={SCENES.manager.from} durationInFrames={SCENES.manager.duration}><ManagerScene/></Sequence><Sequence from={SCENES.finale.from} durationInFrames={SCENES.finale.duration}><FinaleScene/></Sequence>{audioEnabled&&tracks.map((t)=><Sequence key={t.file} from={t.from}><Audio src={staticFile(t.file)} volume={t.volume}/></Sequence>)}<AbsoluteFill style={{pointerEvents:'none',opacity:.055,backgroundImage:'url("data:image/svg+xml,%3Csvg viewBox=%220 0 160 160%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%22.9%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22 opacity=%22.45%22/%3E%3C/svg%3E")',mixBlendMode:'soft-light'}}/></AbsoluteFill>;

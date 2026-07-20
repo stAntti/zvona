@@ -1,0 +1,26 @@
+{
+  "name": "zvona-launch-video",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "preview": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts ZvonaLaunch out/zvona-launch-vertical.mp4 --props=./props/audio.json",
+    "render:silent": "remotion render src/index.ts ZvonaLaunch out/zvona-launch-vertical.mp4 --props=./props/silent.json",
+    "typecheck": "tsc --noEmit",
+    "audio": "node scripts/generate-audio.mjs"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "@remotion/media": "^4.0.0",
+    "@remotion/transitions": "^4.0.0",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "remotion": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "typescript": "^5.9.3"
+  }
+}

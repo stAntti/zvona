@@ -1,0 +1,6 @@
+import {AbsoluteFill,useCurrentFrame} from 'remotion';
+import {EnergyField} from '../components/EnergyField';
+import {RevealText} from '../components/Typography';
+import {sceneOpacity} from '../utils/motion';
+import {COLORS,FONT,SCENES} from '../utils/timing';
+export const FinaleScene:React.FC=()=>{const f=useCurrentFrame();return <AbsoluteFill style={{background:COLORS.black,opacity:sceneOpacity(f,SCENES.finale.duration,5)}}><EnergyField intensity={1.05} speed={.62} focusX={50} focusY={58}/><AbsoluteFill style={{display:'grid',placeItems:'center',textAlign:'center'}}><div><RevealText frame={f} start={8} style={{fontSize:100,fontWeight:760,lineHeight:1}}>ZVONA</RevealText><RevealText frame={f} start={24} style={{fontSize:20,color:'#b7c6d8',marginTop:14}}>AI-управляемый отдел B2B-продаж</RevealText><div style={{height:55}}/><RevealText frame={f} start={38} style={{fontSize:32,fontWeight:620}}>Люди звонят. <span style={{color:COLORS.cyan}}>AI ведёт.</span></RevealText></div></AbsoluteFill><div style={{position:'absolute',bottom:55,left:0,right:0,textAlign:'center',fontFamily:FONT,color:COLORS.muted,fontSize:11,letterSpacing:'.22em'}}>QUEUE · CALL · QUALITY · RESULT</div></AbsoluteFill>};

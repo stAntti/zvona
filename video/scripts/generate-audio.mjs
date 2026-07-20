@@ -1,0 +1,12 @@
+import {mkdirSync,writeFileSync} from 'node:fs';
+import {join} from 'node:path';
+const rate=48000;const dir=new URL('../public/audio/',import.meta.url);mkdirSync(dir,{recursive:true});
+const wav=(name,duration,fn)=>{const n=Math.floor(rate*duration);const data=Buffer.alloc(44+n*2);data.write('RIFF',0);data.writeUInt32LE(36+n*2,4);data.write('WAVEfmt ',8);data.writeUInt32LE(16,16);data.writeUInt16LE(1,20);data.writeUInt16LE(1,22);data.writeUInt32LE(rate,24);data.writeUInt32LE(rate*2,28);data.writeUInt16LE(2,32);data.writeUInt16LE(16,34);data.write('data',36);data.writeUInt32LE(n*2,40);for(let i=0;i<n;i++){const t=i/rate;const fade=Math.min(1,t/.02,(duration-t)/.08);const v=Math.max(-1,Math.min(1,fn(t,duration)*fade));data.writeInt16LE(Math.round(v*32767),44+i*2)}writeFileSync(join(dir.pathname.replace(/^\/(.:)/,'$1'),name),data)};
+const noise=(t)=>{const x=Math.sin(t*12412.9898)*43758.5453;return (x-Math.floor(x))*2-1};
+wav('atmosphere.wav',21,(t)=>.11*Math.sin(2*Math.PI*42*t)+.025*noise(t));
+wav('brand-impact.wav',1.8,(t,d)=>.65*Math.sin(2*Math.PI*(58-20*t/d)*t)*Math.exp(-2.5*t)+.12*noise(t)*Math.exp(-7*t));
+wav('scan.wav',.75,(t,d)=>.22*Math.sin(2*Math.PI*(280+1200*t/d)*t)*Math.sin(Math.PI*t/d));
+wav('click.wav',.18,(t)=>.3*Math.sin(2*Math.PI*980*t)*Math.exp(-32*t));
+wav('score-hit.wav',.9,(t)=>.38*Math.sin(2*Math.PI*92*t)*Math.exp(-5*t)+.12*Math.sin(2*Math.PI*740*t)*Math.exp(-12*t));
+wav('final-hit.wav',2,(t)=>.52*Math.sin(2*Math.PI*48*t)*Math.exp(-2.1*t)+.13*Math.sin(2*Math.PI*190*t)*Math.exp(-4*t));
+console.log('Generated procedural WAV assets.');
